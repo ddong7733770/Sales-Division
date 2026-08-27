@@ -1,0 +1,1274 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>아이코닉스 영업본부 실적 대시보드</title>
+  
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+  
+  <style>
+    :root {
+      --color-primary-500: #F0B90B;
+      --color-up-500: #0ECB81;
+      --color-down-500: #F6465D;
+      --bg-base: #F5F5F5;
+      --bg-elevated: #FFFFFF;
+      --bg-subtle: #F0F1F2;
+      --text-primary: #1E2329;
+      --text-secondary: #474D57;
+      --text-tertiary: #848E9C;
+      --text-on-primary: #0B0E11;
+      --border-default: #EAECEF;
+      --border-subtle: #F0F1F2;
+      --border-strong: #B7BDC6;
+      --radius-sm: 2px;
+      --radius-md: 4px;
+      --radius-lg: 6px;
+      --shadow-sm: 0 1px 2px rgba(24,26,32,0.06);
+    }
+
+    * { box-sizing: border-box; }
+    
+    body {
+      margin: 0;
+      background: var(--bg-base);
+      color: var(--text-primary);
+      font-family: -apple-system, BlinkMacSystemFont, 'Pretendard', sans-serif;
+      font-variant-numeric: tabular-nums;
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* Login Screen */
+    #login-screen {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: var(--bg-base);
+      display: flex; justify-content: center; align-items: center; flex-direction: column;
+      z-index: 9999;
+    }
+    .login-box {
+      background: var(--bg-elevated); padding: 40px 30px; border-radius: 12px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.08); text-align: center; width: 340px;
+    }
+    .login-box h2 { margin-top: 0; font-size: 20px; color: var(--text-primary); margin-bottom: 24px; }
+    .login-box input {
+      width: 100%; padding: 12px; border: 1px solid var(--border-strong);
+      border-radius: var(--radius-md); font-size: 14px; margin-bottom: 16px;
+    }
+    .login-box button {
+      width: 100%; padding: 12px; background: var(--color-primary-500); color: var(--text-on-primary);
+      border: none; border-radius: var(--radius-md); font-size: 15px; font-weight: 700; cursor: pointer;
+    }
+    .login-box button:hover { opacity: 0.9; }
+
+    /* Dashboard Layout */
+    #dashboard-wrapper { display: none; width: 100%; height: 100%; }
+
+    .sidebar { width: 220px; background: var(--bg-elevated); border-right: 1px solid var(--border-default); display: flex; flex-direction: column; flex-shrink: 0; z-index: 100; }
+    .brand { height: 60px; padding: 0 24px; display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 800; border-bottom: 1px solid var(--border-default); }
+    .brand .dia { width: 14px; height: 14px; background: var(--color-primary-500); transform: rotate(45deg); }
+    .nav-menu { padding: 16px 12px; display: flex; flex-direction: column; gap: 8px; }
+    .nav-item { padding: 12px 16px; border-radius: var(--radius-md); font-size: 14px; font-weight: 600; cursor: pointer; color: var(--text-secondary); }
+    .nav-item:hover { background: var(--bg-subtle); color: var(--text-primary); }
+    .nav-item.active { background: rgba(240,185,11,0.15); color: #B38800; font-weight: 700; }
+    
+    .main-wrapper { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+    .topbar { height: 60px; padding: 0 24px; background: var(--bg-elevated); border-bottom: 1px solid var(--border-default); display: flex; align-items: center; justify-content: flex-end; flex-shrink: 0; gap:16px;}
+    .btn-outline { border: 1px solid var(--border-strong); background: transparent; padding: 6px 12px; border-radius: var(--radius-md); font-size: 12px; font-weight: 600; cursor: pointer; color: var(--text-primary); }
+    .btn-outline:hover { border-color: var(--color-primary-500); color: var(--color-primary-500); }
+
+    .content-area { flex: 1; overflow-y: auto; padding-bottom: 60px; display: none; }
+    .content-area.active { display: block; }
+
+    .master-filter { background: var(--bg-elevated); padding: 12px 24px; border-bottom: 1px solid var(--border-default); display: flex; gap: 20px; align-items: center; position: sticky; top: 0; z-index: 50; box-shadow: var(--shadow-sm); }
+    .filter-group { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; }
+    .filter-select { padding: 6px 10px; border: 1px solid var(--border-default); border-radius: var(--radius-sm); font-size: 13px; background: var(--bg-subtle); cursor: pointer; }
+
+    .dashboard-container { max-width: 1500px; margin: 0 auto; padding: 24px; display: flex; flex-direction: column; gap: 24px; }
+    
+    .kpi-grid { display: grid; gap: 16px; }
+    .kpi-card { background: var(--bg-elevated); border: 1px solid var(--border-default); border-radius: var(--radius-lg); padding: 20px; display: flex; flex-direction: column; gap: 8px; }
+    .kpi-title { font-size: 13px; font-weight: 600; color: var(--text-secondary); display: flex; justify-content: space-between; }
+    .kpi-value { font-size: 26px; font-weight: 800; color: var(--text-primary); display: flex; align-items: baseline; gap: 4px; }
+    .kpi-unit { font-size: 13px; font-weight: 600; color: var(--text-tertiary); }
+    .kpi-sub { font-size: 12px; font-weight: 600; color: var(--text-tertiary); margin-top: -4px; }
+    
+    .sales-kpi-grid { grid-template-columns: repeat(3, 1fr); }
+    .inv-kpi-grid { grid-template-columns: repeat(5, 1fr); }
+
+    .grid-row { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; }
+    .card { background: var(--bg-elevated); border: 1px solid var(--border-default); border-radius: var(--radius-lg); padding: 20px; display: flex; flex-direction: column; }
+    .card-header { font-size: 15px; font-weight: 700; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+    .card-header-left { display: flex; align-items: center; gap: 8px; }
+    .card-header-left::before { content: ''; width: 4px; height: 14px; background: var(--color-primary-500); border-radius: 2px; }
+    
+    .chart-wrapper { position: relative; flex-grow: 1; min-height: 280px; }
+    .chart-wrapper.large { min-height: 480px; }
+
+    .data-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .data-table th, .data-table td { padding: 12px 10px; text-align: right; border-bottom: 1px solid var(--border-subtle); }
+    .data-table th { color: var(--text-tertiary); font-weight: 600; background: var(--bg-subtle); cursor: pointer; user-select: none; }
+    .data-table th:hover { color: var(--color-primary-500); }
+    .data-table th:first-child, .data-table td:first-child { text-align: left; }
+    .data-table tr.clickable:hover { background: var(--bg-subtle); cursor: pointer; }
+    .data-table tr.selected { background: rgba(240,185,11,0.1); }
+
+    .tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+    .tab-btn { padding: 5px 12px; font-size: 12px; font-weight: 600; border: 1px solid var(--border-default); border-radius: var(--radius-sm); background: var(--bg-subtle); cursor: pointer; }
+    .tab-btn.active { background: var(--color-primary-500); color: var(--text-on-primary); border-color: var(--color-primary-500); }
+
+    .up { color: var(--color-up-500); font-weight: 700; }
+    .down { color: var(--color-down-500); font-weight: 700; }
+    .bad-stock { color: var(--color-down-500); font-weight: 700; }
+    .btn-delete { color: var(--color-down-500); font-weight: bold; cursor: pointer; padding: 0 4px; }
+    .btn-delete:hover { background: #fee; border-radius: 4px; }
+
+    .search-input-wrap { display: flex; gap: 8px; max-width: 400px; align-items:center; }
+    .search-input { width: 200px; padding: 8px 12px; border: 1px solid var(--border-strong); border-radius: var(--radius-md); font-size: 13px; }
+    .search-input:focus { outline: none; border-color: var(--color-primary-500); }
+    
+    #file-input { display: none; }
+  </style>
+</head>
+<body>
+
+  <!-- Login Screen -->
+  <div id="login-screen">
+    <div class="login-box">
+      <h2>아이코닉스 영업본부 실적 대시보드</h2>
+      <input type="password" id="pwInput" placeholder="대소문자/숫자/특수기호" onkeydown="if(event.key==='Enter') checkPassword()">
+      <button onclick="checkPassword()">데이터 확인하기</button>
+    </div>
+  </div>
+
+  <!-- Dashboard Wrapper -->
+  <div id="dashboard-wrapper">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="dia"></div>
+        <span>아이코닉스 실적</span>
+      </div>
+      <nav class="nav-menu">
+        <div class="nav-item active" onclick="switchTab('sales', this)">📊 매출 현황</div>
+        <div class="nav-item" onclick="switchTab('inventory', this)">📦 재고 현황</div>
+      </nav>
+    </aside>
+
+    <main class="main-wrapper">
+      <header class="topbar">
+        <span id="update-status" style="font-size:12px; color:var(--text-tertiary);">데이터 로드 대기중...</span>
+        <button class="btn-outline" onclick="document.getElementById('file-input').click()">파일 변경하기 (업로드)</button>
+        <input type="file" id="file-input" accept=".xlsx, .xls">
+      </header>
+
+      <!-- ==================== TAB 1: 매출 현황 ==================== -->
+      <section id="view-sales" class="content-area active">
+        <div class="master-filter">
+          <div class="filter-group">
+            <label>연도</label><select id="filterYear" class="filter-select" onchange="applyFilters()"><option value="ALL">전체</option></select>
+          </div>
+          <div class="filter-group">
+            <label>월</label><select id="filterMonth" class="filter-select" onchange="applyFilters()"><option value="ALL">전체</option></select>
+          </div>
+          <div class="filter-group">
+            <label>IP</label>
+            <select id="filterIP" class="filter-select" onchange="applyFilters()">
+              <option value="ALL">전체</option><option value="뽀로로">뽀로로</option><option value="타요">타요</option>
+              <option value="퍼글러">퍼글러</option><option value="잔망루피">잔망루피</option>
+              <option value="데코데코">데코데코</option><option value="해치">해치</option><option value="기타">기타</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label>영업팀</label>
+            <select id="filterTeam" class="filter-select" onchange="applyFilters()">
+              <option value="ALL">전체</option><option value="영업1팀">영업1팀</option><option value="영업2팀">영업2팀</option>
+              <option value="온라인영업팀">온라인영업팀</option><option value="해외영업팀">해외영업팀</option><option value="영업기획팀">영업기획팀</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="dashboard-container">
+          <!-- Sales KPI -->
+          <div class="kpi-grid sales-kpi-grid">
+            <div class="kpi-card">
+              <div class="kpi-title">매출액</div>
+              <div class="kpi-value"><span id="kpi-revenue">-</span> <span class="kpi-unit">억원</span></div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-title">판매수량</div>
+              <div class="kpi-value"><span id="kpi-qty">-</span> <span class="kpi-unit">개</span></div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-title">평균 판매단가</div>
+              <div class="kpi-value"><span id="kpi-asp">-</span> <span class="kpi-unit">원</span></div>
+            </div>
+          </div>
+
+          <!-- Row 1 -->
+          <div class="grid-row">
+            <div class="card">
+              <div class="card-header">
+                <div class="card-header-left">
+                  월별 매출 추세 (선택월 기준 이전 12개월)
+                  <span style="font-size:11px; font-weight:normal; color:var(--text-tertiary); margin-left:6px;">(단위 : 백만원)</span>
+                </div>
+              </div>
+              <div class="chart-wrapper"><canvas id="trendChart"></canvas></div>
+            </div>
+            <div class="card">
+              <div class="card-header">
+                <div class="card-header-left">영업팀별 매출현황</div>
+                <span style="font-size:11px; font-weight:normal; color:var(--text-tertiary);">*팀 필터 미적용</span>
+              </div>
+              <table class="data-table">
+                <thead><tr><th>영업팀</th><th>매출액(백만)</th><th>매출 비중</th></tr></thead>
+                <tbody id="teamTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Row 2 -->
+          <div class="grid-row" style="grid-template-columns: 1fr 1fr;">
+            <div class="card">
+              <div class="card-header" style="justify-content: space-between;">
+                <div class="card-header-left">
+                  매출 TOP 20 <span style="background:#000; color:#fff; font-size:10px; padding:3px 6px; border-radius:3px; margin-left:8px; font-weight:normal;">(판매 수량)</span>
+                </div>
+                <div style="display:flex; align-items:center; gap: 16px;">
+                  <span style="font-size:11px; color:var(--text-tertiary);">단위 : 백만원</span>
+                  <div class="tabs" id="top20Tabs">
+                    <button class="tab-btn active" onclick="updateTop20('ALL')">전체</button>
+                    <button class="tab-btn" onclick="updateTop20('T1')">문완구(T1)</button>
+                    <button class="tab-btn" onclick="updateTop20('P1')">출판(P1)</button>
+                    <button class="tab-btn" onclick="updateTop20('L1')">굿즈(L1)</button>
+                    <button class="tab-btn" onclick="updateTop20('T2')">수입완구(T2)</button>
+                  </div>
+                </div>
+              </div>
+              <div class="chart-wrapper large"><canvas id="top20Chart"></canvas></div>
+            </div>
+
+            <div class="card">
+              <div class="card-header">
+                <div class="card-header-left">핵심 거래처 (TOP 10)</div>
+                <div class="tabs" id="clientTabs">
+                  <button class="tab-btn active" onclick="updateClients('ALL')">전체</button>
+                  <button class="tab-btn" onclick="updateClients('영업1팀')">영업1팀</button>
+                  <button class="tab-btn" onclick="updateClients('영업2팀')">영업2팀</button>
+                  <button class="tab-btn" onclick="updateClients('온라인영업팀')">온라인</button>
+                  <button class="tab-btn" onclick="updateClients('해외영업팀')">해외</button>
+                  <button class="tab-btn" onclick="updateClients('영업기획팀')">기획</button>
+                </div>
+              </div>
+              <table class="data-table">
+                <thead><tr><th>순위</th><th>거래처명</th><th>비중(%)</th><th>매출(백만)</th><th>전월비 증감율</th></tr></thead>
+                <tbody id="clientTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+          
+          <!-- Row 3: Product Detail Search -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-header-left">제품 상세 검색</div>
+              <div class="search-input-wrap">
+                <input type="text" id="searchInput" class="search-input" placeholder="직접 검색 (품목/이름/IP)" list="productList" onkeydown="if(event.key==='Enter') addProductManual()">
+                <datalist id="productList"></datalist>
+                <button class="btn-outline" style="background:var(--text-primary); color:#fff; border:none;" onclick="addProductManual()">추가</button>
+              </div>
+            </div>
+            
+            <div style="margin-bottom: 16px; display:flex; gap:16px; align-items:center; flex-wrap:wrap;">
+              <div class="tabs" id="detailAgeTabs">
+                <button id="btnAge6" class="tab-btn" onclick="toggleDetailAge(6)">신제품(6개월)</button>
+                <button id="btnAge3" class="tab-btn" onclick="toggleDetailAge(3)">3개월</button>
+                <button id="btnAgeYear" class="tab-btn" onclick="toggleDetailAge('year')">올해</button>
+              </div>
+              <div style="display:flex; gap:8px;">
+                <select id="detailCodeFilter" class="filter-select" onchange="applyDetailFilters()">
+                  <option value="ALL">코드 전체</option><option value="T1">문완구(T1)</option>
+                  <option value="P1">출판(P1)</option><option value="L1">굿즈(L1)</option><option value="T2">수입완구(T2)</option>
+                </select>
+                <select id="detailIpFilter" class="filter-select" onchange="applyDetailFilters()">
+                  <option value="ALL">IP 전체</option><option value="뽀로로">뽀로로</option><option value="타요">타요</option>
+                  <option value="잔망루피">잔망루피</option><option value="데코데코">데코데코</option>
+                  <option value="해치">해치</option><option value="퍼글러">퍼글러</option><option value="기타">기타</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="grid-row" style="grid-template-columns: 2fr 1fr; gap:24px; margin-bottom:24px;">
+              <div style="overflow-x:auto; max-height:400px;">
+                <table class="data-table">
+                  <thead style="position: sticky; top: 0; z-index: 10;">
+                    <tr>
+                      <th>No</th><th>삭제</th><th>품목(코드)</th><th>품목명</th><th>IP</th><th>구분</th>
+                      <th>MOQ</th><th>금형비</th><th>광고비</th><th>소비자가</th>
+                      <th>평균판매가</th><th style="color:#000;">매출액(백만)</th>
+                    </tr>
+                  </thead>
+                  <tbody id="detailTableBody">
+                    <tr><td colspan="12" style="text-align:center; padding: 20px; color:var(--text-tertiary);">검색창이나 필터 버튼을 이용해 제품을 불러오세요.</td></tr>
+                  </tbody>
+                </table>
+              </div>
+              
+              <div style="display:flex; flex-direction:column;">
+                <div style="font-size:13px; font-weight:700; margin-bottom:8px;">선택 제품 판매처 TOP 10</div>
+                <table class="data-table">
+                  <thead><tr><th style="text-align:left;">거래처명</th><th>매출(백만)</th><th>비중(%)</th></tr></thead>
+                  <tbody id="detailClientTableBody">
+                    <tr><td colspan="3" style="text-align:center; padding: 20px; color:var(--text-tertiary);">제품을 선택하세요.</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- 24 Month Chart Area -->
+            <div style="display:flex; flex-direction:column; gap:12px;">
+              <div style="font-size:13px; font-weight:700; border-top:1px solid var(--border-default); padding-top:16px;">
+                24개월 추이: <span id="chartTargetName" style="color:var(--color-primary-500)">선택 안됨</span>
+              </div>
+              <div class="tabs">
+                <button class="tab-btn active" onclick="switchDetailMode('revenue')">매출액</button>
+                <button class="tab-btn" onclick="switchDetailMode('qty')">판매수량</button>
+              </div>
+              <div class="chart-wrapper" style="min-height:280px; height:280px;"><canvas id="detailTrendChart"></canvas></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== TAB 2: 재고 현황 ==================== -->
+      <section id="view-inventory" class="content-area">
+        <div class="dashboard-container">
+          <!-- Inv KPI (5 Columns) -->
+          <div class="kpi-grid inv-kpi-grid">
+            <div class="kpi-card">
+              <div class="kpi-title">총 재고수량</div>
+              <div class="kpi-value"><span id="inv-total-qty">-</span> <span class="kpi-unit">개</span></div>
+              <div class="kpi-sub">총 금액: <span id="inv-total-value">-</span> 억원</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-title">영업본부 재고 수량</div>
+              <div class="kpi-value"><span id="inv-hq-qty">-</span> <span class="kpi-unit">개</span></div>
+              <div class="kpi-sub" id="inv-hq-sub">총 재고수량 대비 -%</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-title">악성재고 (3~5등급)</div>
+              <div class="kpi-value" style="color:var(--color-down-500);"><span id="inv-bad-qty">-</span> <span class="kpi-unit" style="color:inherit;">개</span></div>
+              <div class="kpi-sub" id="inv-bad-sub">영업본부 재고 대비 -%</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-title">문완구(T1) 재고율</div>
+              <div class="kpi-value"><span id="inv-rate-t1">-</span> <span class="kpi-unit">%</span></div>
+              <div class="kpi-sub">최근 12개월 기준 산출</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-title">출판(P1) 재고율</div>
+              <div class="kpi-value"><span id="inv-rate-p1">-</span> <span class="kpi-unit">%</span></div>
+              <div class="kpi-sub">최근 12개월 기준 산출</div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-header-left">전체 창고별 재고 현황 (Top 100)</div>
+              <div style="display:flex; align-items:center; gap: 16px; flex-wrap: wrap;">
+                <div class="tabs" id="invGradeTabs">
+                  <button class="tab-btn active" onclick="setInvGrade('ALL')">전체</button>
+                  <button class="tab-btn" onclick="setInvGrade('신제품')">신제품</button>
+                  <button class="tab-btn" onclick="setInvGrade('1')">1등급</button>
+                  <button class="tab-btn" onclick="setInvGrade('2')">2등급</button>
+                  <button class="tab-btn" onclick="setInvGrade('3')">3등급</button>
+                  <button class="tab-btn" onclick="setInvGrade('4')">4등급</button>
+                  <button class="tab-btn" onclick="setInvGrade('5')">5등급</button>
+                  <button class="tab-btn" onclick="setInvGrade('BAD')">악성(3~5)</button>
+                </div>
+              </div>
+            </div>
+            
+            <div style="overflow-x: auto; max-height: 800px;">
+              <table class="data-table" id="invTable">
+                <thead style="position: sticky; top: 0; z-index: 10;">
+                  <tr>
+                    <th>
+                      <select id="invCodeFilter" class="filter-select" style="font-size:11px; padding:2px; margin-bottom:4px;" onchange="renderInventoryTable()">
+                        <option value="ALL">코드 전체</option><option value="T1">T1</option><option value="P1">P1</option>
+                        <option value="T2">T2</option><option value="L1">L1</option>
+                      </select>
+                      <br><span onclick="sortInvTable('code')">품목코드 ↕</span>
+                    </th>
+                    <th>
+                      <select id="invIpFilter" class="filter-select" style="font-size:11px; padding:2px; margin-bottom:4px;" onchange="renderInventoryTable()">
+                        <option value="ALL">IP 전체</option><option value="뽀로로">뽀로로</option><option value="타요">타요</option>
+                        <option value="데코데코">데코데코</option><option value="잔망루피">잔망루피</option>
+                        <option value="해치">해치</option><option value="퍼글러">퍼글러</option><option value="기타">기타</option>
+                      </select>
+                      <br><span onclick="sortInvTable('ip')">IP ↕</span>
+                    </th>
+                    <th onclick="sortInvTable('name')" style="vertical-align:bottom;">품목명 ↕</th>
+                    <th onclick="sortInvTable('grade')" style="vertical-align:bottom;">등급 ↕</th>
+                    <th onclick="sortInvTable('total')" style="vertical-align:bottom; color:var(--text-tertiary); font-weight:normal;">재고 합계 ↕</th>
+                    <th onclick="sortInvTable('hqTotal')" style="vertical-align:bottom;">영업본부 합계 ↕</th>
+                    <th onclick="sortInvTable('t1')" style="vertical-align:bottom;">영업1팀 ↕</th>
+                    <th onclick="sortInvTable('t2')" style="vertical-align:bottom;">영업2팀 ↕</th>
+                    <th onclick="sortInvTable('on')" style="vertical-align:bottom;">온라인영업팀 ↕</th>
+                    <th onclick="sortInvTable('ov')" style="vertical-align:bottom;">해외영업팀 ↕</th>
+                    <th onclick="sortInvTable('pl')" style="vertical-align:bottom;">영업기획팀 ↕</th>
+                  </tr>
+                  <!-- 합계 고정 노출용 Row -->
+                  <tr style="background: var(--bg-subtle); border-bottom: 2px solid var(--border-strong);">
+                    <td colspan="4" style="text-align:center; font-weight:bold;">필터 합계</td>
+                    <td id="invSumTotal" style="color:var(--text-tertiary); font-weight:bold;">0</td>
+                    <td id="invSumHq" style="font-weight:bold;">0</td>
+                    <td id="invSumT1" style="font-weight:bold;">0</td>
+                    <td id="invSumT2" style="font-weight:bold;">0</td>
+                    <td id="invSumOn" style="font-weight:bold;">0</td>
+                    <td id="invSumOv" style="font-weight:bold;">0</td>
+                    <td id="invSumPl" style="font-weight:bold;">0</td>
+                  </tr>
+                </thead>
+                <tbody id="invTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    Chart.register(ChartDataLabels);
+
+    // ================== Global States ==================
+    // 구글 시트 게시된 엑셀 다운로드 링크
+    const GOOGLE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ5vrceOm5JVSWf6tJQPgW0FnbaTk8TLrk-4V5YvJiEG-pg9w51LaTc3aslvmwokg/pub?output=xlsx';
+
+    let rawSales = [];
+    let rawInv = [];
+    let prodDict = {}; 
+    let globalProductMeta = {}; 
+    let firstSalesDict = {}; 
+    let charts = {};
+    let searchOptions = new Set();
+    
+    let currentFilters = { year: 'ALL', month: 'ALL', ip: 'ALL', team: 'ALL' };
+    let currentTop20Type = 'ALL';
+    let currentClientTeam = 'ALL';
+    
+    let selectedProducts = []; 
+    let detailChartMode = 'revenue';
+    let detailTargetCode = null;
+    let currentDetailAge = null; 
+
+    let invSortState = { key: 'total', asc: false };
+    let currentInvGradeFilter = 'ALL';
+
+    const wh_team1 = ['문완구 본사 창고', '문완구 자사물류 정품', '문완구 자사물류 적송재고', '문완구 자사물류 폐기', '문완구 오프라인행사 가상 창고(직판매)', '문완구 오프라인행사 가상 창고(직판매) 2', '문완구_서울디자인재단 오프라인 창고'];
+    const wh_team2 = ['출판 자사물류 정품', '출판 자사물류 반품', '출판 자사물류 폐기', '출판 날개물류 출판창고'];
+    const wh_online = ['온라인 B2B 창고 (본사)', '온라인 B2C 창고', '온라인 B2B 반품 창고 (본사)', '온라인 B2B 대기 창고 (본사)(구,온라인_중국_VIP창고)', '온라인 날개물류 (도서3PL)', '온라인 특판 창고(N)', '온라인 특판 창고(M)', '온라인 보관창고', '온라인 특판창고(29CM)', '영업본부 창고_에스에이치(SH)'];
+    const wh_overseas = ['해외 본사창고', '해외_중국창고', '해외_자사물류 창고'];
+    const wh_planning = ['영업기획팀 B2B제휴', '신규사업팀 특판', '신규사업팀 특판(MQ)'];
+
+    // ================== Utility Functions ==================
+    const toHMil = (val) => (val / 100000000).toFixed(1); 
+    const formatNum = (val) => new Intl.NumberFormat('ko-KR').format(Math.round(val));
+    const safeFormat = (val) => {
+      if(val === undefined || val === null || val === '' || Number.isNaN(Number(val))) return '-';
+      return formatNum(val);
+    };
+    function safeSum(row, cols) { return cols.reduce((sum, col) => sum + (parseFloat(row[col]) || 0), 0); }
+    function parseDateToYm(val) {
+      if(!val) return null;
+      let d = null;
+      if(typeof val === 'number') d = new Date(Math.round((val - 25569)*86400*1000));
+      else if(typeof val === 'string') {
+        let m = val.match(/(\d{4})[-/.](\d{1,2})/);
+        if(m) d = new Date(m[1], m[2]-1, 1);
+        else d = new Date(val);
+      } else if(val instanceof Date) d = val;
+      if(d && !isNaN(d.getTime())) return { d, y: d.getFullYear() + '년', m: String(d.getMonth() + 1).padStart(2, '0') + '월', ym: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` };
+      return null;
+    }
+    function classifyIP(str) {
+      if(!str) return '기타';
+      const k = ['뽀로로', '타요', '퍼글러', '잔망루피', '데코데코', '해치'];
+      for(let i=0; i<k.length; i++) if(str.includes(k[i])) return k[i];
+      return '기타';
+    }
+
+    // Chart Plugin
+    const launchLinePlugin = {
+      id: 'launchLine',
+      afterDraw: (chart) => {
+        if(!detailTargetCode) return;
+        let launchYm = firstSalesDict[detailTargetCode];
+        if(!launchYm) return;
+        let lbl = launchYm.substring(2).replace('-','.'); 
+        let idx = chart.data.labels.indexOf(lbl);
+        if(idx !== -1) {
+          let ctx = chart.ctx;
+          let meta = chart.getDatasetMeta(0);
+          if(!meta.data[idx]) return;
+          let pt = meta.data[idx];
+          ctx.save(); ctx.beginPath(); ctx.setLineDash([4, 4]);
+          ctx.moveTo(pt.x, pt.y); ctx.lineTo(pt.x, chart.chartArea.top + 15);
+          ctx.strokeStyle = '#1E2329'; ctx.stroke();
+          ctx.fillStyle = '#1E2329'; ctx.font = 'bold 10px sans-serif';
+          ctx.textAlign = 'center'; ctx.fillText('출시일', pt.x, chart.chartArea.top + 10);
+          ctx.restore();
+        }
+      }
+    };
+    Chart.register(launchLinePlugin);
+
+    // ================== Initialization & Data Load ==================
+    function checkPassword() {
+      const pw = document.getElementById('pwInput').value;
+      if (pw === '0855') {
+        document.getElementById('login-screen').style.display = 'none';
+        document.getElementById('dashboard-wrapper').style.display = 'flex';
+        loadGoogleSheetData();
+        setupHourlyUpdate();
+      } else {
+        alert('패스워드를 확인해주세요.');
+      }
+    }
+
+    async function loadGoogleSheetData() {
+      document.getElementById('update-status').innerText = '데이터 업데이트 중...';
+      try {
+        const response = await fetch(GOOGLE_SHEET_URL, { cache: 'no-store' });
+        if (!response.ok) throw new Error('Fetch failed');
+        const arrayBuffer = await response.arrayBuffer();
+        parseWorkbook(arrayBuffer);
+        const now = new Date();
+        document.getElementById('update-status').innerText = `최종 갱신: ${now.toLocaleTimeString()}`;
+      } catch (err) {
+        console.error('Data load error:', err);
+        alert('데이터를 자동으로 불러오는데 실패했습니다. 상단의 [파일 변경하기] 버튼을 통해 파일을 수동으로 업로드해주세요.');
+        document.getElementById('update-status').innerText = '업데이트 실패';
+      }
+    }
+
+    function setupHourlyUpdate() {
+      const now = new Date();
+      const msUntilNextHour = (60 - now.getMinutes()) * 60000 - (now.getSeconds() * 1000) - now.getMilliseconds();
+      setTimeout(() => {
+        loadGoogleSheetData();
+        setupHourlyUpdate(); // recursively trigger
+      }, msUntilNextHour);
+    }
+
+    document.getElementById('file-input').addEventListener('change', (e) => {
+      if(e.target.files.length > 0) {
+        const reader = new FileReader();
+        reader.onload = (ev) => parseWorkbook(ev.target.result);
+        reader.readAsArrayBuffer(e.target.files[0]);
+      }
+    });
+
+    function switchTab(viewId, el) {
+      document.querySelectorAll('.nav-item').forEach(e => e.classList.remove('active'));
+      el.classList.add('active');
+      document.querySelectorAll('.content-area').forEach(e => e.classList.remove('active'));
+      document.getElementById('view-' + viewId).classList.add('active');
+    }
+
+    function parseWorkbook(buffer) {
+      const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
+      
+      let sSheet = workbook.Sheets['영업본부 누적매출'];
+      rawSales = sSheet ? XLSX.utils.sheet_to_json(sSheet, {raw: false, dateNF: 'yyyy-mm-dd'}) : [];
+      
+      let iSheet = workbook.Sheets['창고별 재고'];
+      let invList = iSheet ? XLSX.utils.sheet_to_json(iSheet, {defval: 0}) : [];
+      rawInv = invList.filter((r, i) => i > 0 && r['품목명'] && r['품목명'] !== '합계');
+      
+      let pSheet = workbook.Sheets['제품정보'];
+      let prodList = pSheet ? XLSX.utils.sheet_to_json(pSheet) : [];
+      prodDict = {}; prodList.forEach(p => { if(p['코드']) prodDict[p['코드']] = p; });
+
+      let years = new Set(), months = new Set();
+      searchOptions.clear();
+      firstSalesDict = {};
+      globalProductMeta = {};
+      
+      for(let i=0; i<rawSales.length; i++) {
+        let r = rawSales[i];
+        let d = parseDateToYm(r['매출일자']);
+        if(d) { r._date = d.d; r._y = d.y; r._m = d.m; r._ym = d.ym; years.add(d.y); months.add(d.m); }
+        
+        r._ip = classifyIP((r['품목군명']||'') + ' ' + (r['품목명']||''));
+        let code = r['품목'] || '';
+        r._type = code.length >= 4 ? code.substring(2,4) : '기타';
+        r._rev = parseFloat(String(r['금액']||'0').replace(/,/g,''))||0;
+        r._qty = parseFloat(String(r['수량']||'0').replace(/,/g,''))||0;
+        
+        if(code) {
+          searchOptions.add(`${code} | ${r['품목명']} | ${r._ip}`);
+          if(!firstSalesDict[code] || r._ym < firstSalesDict[code]) firstSalesDict[code] = r._ym;
+          if(!globalProductMeta[code]) globalProductMeta[code] = { name: r['품목명'], ip: r._ip, type: r._type };
+        }
+      }
+
+      updateSelect('filterYear', Array.from(years).sort().reverse());
+      updateSelect('filterMonth', Array.from(months).sort());
+      
+      const dl = document.getElementById('productList');
+      dl.innerHTML = '';
+      searchOptions.forEach(opt => dl.innerHTML += `<option value="${opt}">`);
+
+      processInventoryGrades();
+
+      document.getElementById('filterYear').value = 'ALL';
+      document.getElementById('filterMonth').value = 'ALL';
+      applyFilters();
+      renderInventoryTable();
+    }
+
+    function updateSelect(id, values) {
+      const sel = document.getElementById(id);
+      sel.innerHTML = '<option value="ALL">전체</option>';
+      values.forEach(v => sel.innerHTML += `<option value="${v}">${v}</option>`);
+    }
+
+    // ================== Inventory Logic ==================
+    function processInventoryGrades() {
+      let maxTime = 0;
+      rawSales.forEach(r => { if(r._date && r._date.getTime() > maxTime) maxTime = r._date.getTime(); });
+      if(maxTime === 0) return;
+      
+      let latestDate = new Date(maxTime);
+      let d12 = new Date(latestDate.getFullYear(), latestDate.getMonth() - 11, 1);
+      let d6 = new Date(latestDate.getFullYear(), latestDate.getMonth() - 5, 1);
+      let d3 = new Date(latestDate.getFullYear(), latestDate.getMonth() - 2, 1);
+
+      let salesAgg = {};
+      let globalSales12mRev = 0;
+      let t1Sales12 = 0, p1Sales12 = 0;
+      let t1InvValue = 0, p1InvValue = 0;
+      
+      rawSales.forEach(r => {
+        if(!r._date) return;
+        let t = r._date.getTime();
+        if(t >= d12.getTime()) {
+          let code = r['품목'];
+          if(!salesAgg[code]) salesAgg[code] = { rev12:0, rev6:0, rev3:0, qty3:0 };
+          salesAgg[code].rev12 += r._rev;
+          globalSales12mRev += r._rev;
+          if(t >= d6.getTime()) salesAgg[code].rev6 += r._rev;
+          if(t >= d3.getTime()) { salesAgg[code].rev3 += r._rev; salesAgg[code].qty3 += r._qty; }
+          
+          if(r._type === 'T1') t1Sales12 += r._rev;
+          if(r._type === 'P1') p1Sales12 += r._rev;
+        }
+      });
+
+      rawInv.forEach(r => {
+        let code = r['품목'];
+        let type = code && code.length >= 4 ? code.substring(2,4) : '기타';
+        let agg = salesAgg[code] || { rev12:0, rev6:0, rev3:0, qty3:0 };
+        let invQty = parseFloat(r['합계']) || 0;
+        
+        let info = prodDict[code] || {};
+        let unitCost = parseFloat(info['표준단위원가']) || 0;
+        let invValue = invQty * unitCost;
+
+        if(type === 'T1') t1InvValue += invValue;
+        if(type === 'P1') p1InvValue += invValue;
+        
+        let isNew = (agg.rev12 === agg.rev3 && agg.rev3 > 0);
+        let score = 0;
+        
+        let portion = globalSales12mRev > 0 ? (agg.rev12 / globalSales12mRev) : 0;
+        if (portion >= 0.005) score -= 1;
+        else if (portion >= 0.001) score -= 0.5;
+        if (agg.rev12 > 0) {
+          let trend = agg.rev6 / agg.rev12;
+          if (trend <= 0.1) score += 1;
+          else if (trend <= 0.5) score += 0.5;
+        }
+        
+        let avgQty3 = agg.qty3 / 3;
+        if (invQty > 0) {
+          let depletion = avgQty3 > 0 ? (invQty / avgQty3) : Infinity;
+          if (depletion <= 6) score += 1;
+          else if (depletion <= 12) score += 2;
+          else if (depletion <= 18) score += 3;
+          else score += 4;
+        }
+        
+        let grade = Math.round(score);
+        if(grade < 0) grade = 0;
+        if(grade > 5) grade = 5;
+        
+        r._ip = classifyIP(r['품목명']);
+        r._type = type;
+        r._grade = isNew ? '신제품' : grade.toString();
+        r._isBad = (grade >= 3 && grade <= 5) && !isNew;
+        
+        r._t1 = safeSum(r, wh_team1);
+        r._t2 = safeSum(r, wh_team2);
+        r._on = safeSum(r, wh_online);
+        r._ov = safeSum(r, wh_overseas);
+        r._pl = safeSum(r, wh_planning);
+        r._hqTotal = r._t1 + r._t2 + r._on + r._ov + r._pl;
+        r._total = invQty; 
+      });
+
+      let t1Rate = (t1InvValue > 0) ? (((t1Sales12 / 12) / t1InvValue) / 12) * 100 : 0;
+      let p1Rate = (p1InvValue > 0) ? (((p1Sales12 / 12) / p1InvValue) / 12) * 100 : 0;
+      
+      document.getElementById('inv-rate-t1').innerText = t1Rate > 0 ? t1Rate.toFixed(2) : '-';
+      document.getElementById('inv-rate-p1').innerText = p1Rate > 0 ? p1Rate.toFixed(2) : '-';
+    }
+
+    // ================== Main Sales Logic ==================
+    function applyFilters() {
+      currentFilters.year = document.getElementById('filterYear').value;
+      currentFilters.month = document.getElementById('filterMonth').value;
+      currentFilters.ip = document.getElementById('filterIP').value;
+      currentFilters.team = document.getElementById('filterTeam').value;
+
+      let filteredNoTeam = [];
+      let filteredFull = [];
+
+      for(let i=0; i<rawSales.length; i++) {
+        let r = rawSales[i];
+        let passDate = (currentFilters.year === 'ALL' || r._y === currentFilters.year) && (currentFilters.month === 'ALL' || r._m === currentFilters.month);
+        let passIP = (currentFilters.ip === 'ALL' || r._ip === currentFilters.ip);
+        if(passDate && passIP) {
+          filteredNoTeam.push(r);
+          if(currentFilters.team === 'ALL' || r['구분'] === currentFilters.team) filteredFull.push(r);
+        }
+      }
+
+      renderKPI(filteredFull);
+      renderTrendChart(); 
+      renderTeamTable(filteredNoTeam); 
+      updateTop20(currentTop20Type);
+      updateClients(currentClientTeam);
+      renderDetailTable();
+    }
+
+    function renderKPI(data) {
+      let rev = 0, qty = 0;
+      for(let i=0; i<data.length; i++) { rev += data[i]._rev; qty += data[i]._qty; }
+      document.getElementById('kpi-revenue').innerText = toHMil(rev);
+      document.getElementById('kpi-qty').innerText = formatNum(qty);
+      document.getElementById('kpi-asp').innerText = formatNum(qty > 0 ? rev/qty : 0);
+    }
+
+    function getTargetYM() {
+      if(currentFilters.year !== 'ALL' && currentFilters.month !== 'ALL') return `${currentFilters.year.replace('년','')}-${currentFilters.month.replace('월','')}`;
+      let allYMs = Array.from(new Set(rawSales.map(r => r._ym))).filter(x=>x).sort();
+      return allYMs.length > 0 ? allYMs[allYMs.length - 1] : null;
+    }
+
+    function renderTrendChart() {
+      let targetYM = getTargetYM();
+      if(!targetYM) return;
+
+      let [ty, tm] = targetYM.split('-').map(Number);
+      let yms = [];
+      for(let i=11; i>=0; i--) {
+        let d = new Date(ty, tm - 1 - i, 1);
+        yms.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+      }
+
+      let mData = {}; yms.forEach(ym => mData[ym] = 0);
+      for(let i=0; i<rawSales.length; i++) {
+        let r = rawSales[i];
+        if(!mData.hasOwnProperty(r._ym)) continue;
+        if(currentFilters.ip !== 'ALL' && r._ip !== currentFilters.ip) continue;
+        if(currentFilters.team !== 'ALL' && r['구분'] !== currentFilters.team) continue;
+        mData[r._ym] += r._rev;
+      }
+
+      let labels = yms.map(ym => ym.substring(2).replace('-','.'));
+      let data = yms.map(ym => Math.round(mData[ym]/1000000));
+      
+      clearChart('trendChart');
+      charts['trendChart'] = new Chart(document.getElementById('trendChart').getContext('2d'), {
+        type: 'line',
+        data: { labels, datasets: [{ data, backgroundColor: 'rgba(240, 185, 11, 0.1)', borderColor: '#F0B90B', borderWidth: 2, fill: true, tension: 0.3 }] },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { 
+            legend: {display: false},
+            datalabels: { anchor: 'end', align: 'top', color: '#1E2329', font: {weight:'bold', size:11}, formatter: (v) => v>0 ? formatNum(v) : '' }
+          },
+          scales: { x:{grid:{display:false}}, y:{grid:{color:'#EAECEF'}, beginAtZero:true} }
+        }
+      });
+    }
+
+    function renderTeamTable(data) {
+      let tMap = {'영업1팀':0, '영업2팀':0, '온라인영업팀':0, '해외영업팀':0, '영업기획팀':0};
+      let total = 0;
+      for(let i=0; i<data.length; i++) {
+        let team = data[i]['구분'];
+        if(tMap.hasOwnProperty(team)) { tMap[team] += data[i]._rev; total += data[i]._rev; }
+      }
+      let tbody = document.getElementById('teamTableBody');
+      tbody.innerHTML = '';
+      Object.keys(tMap).forEach(team => {
+        let pct = total > 0 ? ((tMap[team]/total)*100).toFixed(1) + '%' : '0%';
+        let revMilFormat = formatNum(tMap[team] / 1000000);
+        tbody.innerHTML += `<tr><td>${team}</td><td>${revMilFormat}</td><td>${pct}</td></tr>`;
+      });
+    }
+
+    function updateTop20(type) {
+      currentTop20Type = type;
+      document.querySelectorAll('#top20Tabs .tab-btn').forEach(b => b.classList.toggle('active', (type==='ALL' && b.innerText==='전체') || b.innerText.includes(type)));
+      
+      let map = {};
+      for(let i=0; i<rawSales.length; i++) {
+        let r = rawSales[i];
+        if(currentFilters.year !== 'ALL' && r._y !== currentFilters.year) continue;
+        if(currentFilters.month !== 'ALL' && r._m !== currentFilters.month) continue;
+        if(currentFilters.ip !== 'ALL' && r._ip !== currentFilters.ip) continue;
+        if(currentFilters.team !== 'ALL' && r['구분'] !== currentFilters.team) continue;
+        
+        if(type === 'ALL' || r._type === type) {
+          let name = r['품목명'];
+          if(!map[name]) map[name] = { rev: 0, qty: 0 };
+          map[name].rev += r._rev; map[name].qty += r._qty;
+        }
+      }
+
+      let sorted = Object.entries(map).sort((a,b)=>b[1].rev - a[1].rev).slice(0,20);
+      let labels = sorted.map(v => v[0].length > 15 ? v[0].substring(0,15)+'...' : v[0]);
+      let revData = sorted.map(v => Math.round(v[1].rev/1000000));
+      let qtyData = sorted.map(v => v[1].qty);
+
+      clearChart('top20Chart');
+      charts['top20Chart'] = new Chart(document.getElementById('top20Chart').getContext('2d'), {
+        type: 'bar',
+        data: { labels, datasets: [{ data: revData, backgroundColor: '#1E2329', borderRadius: 4 }] },
+        options: {
+          indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            datalabels: {
+              labels: {
+                revLabel: { align: 'right', anchor: 'end', color: '#1E2329', font: {size:12, weight:'bold'}, formatter: (v) => v>0 ? formatNum(v) : '' },
+                qtyLabel: { align: 'right', anchor: 'start', color: '#fff', font: {size:11}, formatter: (v, ctx) => formatNum(qtyData[ctx.dataIndex]) }
+              }
+            }
+          },
+          scales: { x: { grid:{color:'#EAECEF'}, beginAtZero:true, suggestedMax: Math.max(...revData)*1.1 }, y: { grid:{display:false}, ticks:{font:{size:12, weight:'bold'}} } }
+        }
+      });
+    }
+
+    function updateClients(team) {
+      currentClientTeam = team;
+      document.querySelectorAll('#clientTabs .tab-btn').forEach(b => {
+        b.classList.toggle('active', (team==='ALL' && b.innerText==='전체') || b.innerText.includes(team.replace('영업팀','')));
+      });
+
+      let targetYM = getTargetYM();
+      let prevYM = targetYM ? getPrevYM(targetYM) : null;
+      let cMap = {}, pMap = {};
+      let tRev = 0;
+
+      for(let i=0; i<rawSales.length; i++) {
+        let r = rawSales[i];
+        if(team !== 'ALL' && r['구분'] !== team) continue;
+        if(currentFilters.ip !== 'ALL' && r._ip !== currentFilters.ip) continue;
+        let client = r['거래처'];
+        if(currentFilters.year === 'ALL' || currentFilters.month === 'ALL') {
+          cMap[client] = (cMap[client]||0) + r._rev; tRev += r._rev;
+        } else {
+          if(r._ym === targetYM) { cMap[client] = (cMap[client]||0) + r._rev; tRev += r._rev; }
+        }
+        if(r._ym === prevYM) pMap[client] = (pMap[client]||0) + r._rev;
+      }
+
+      let sorted = Object.entries(cMap).sort((a,b)=>b[1]-a[1]).slice(0,10);
+      let tbody = document.getElementById('clientTableBody');
+      tbody.innerHTML = '';
+      sorted.forEach((v, i) => {
+        let pct = tRev > 0 ? ((v[1]/tRev)*100).toFixed(1)+'%' : '0%';
+        let pVal = pMap[v[0]] || 0;
+        let tHtml = '-';
+        if(pVal > 0) {
+          let mom = ((v[1] - pVal)/pVal)*100;
+          let color = mom > 0 ? 'var(--color-up-500)' : 'var(--color-down-500)';
+          let arrow = mom > 0 ? '▲' : '▼';
+          tHtml = `<span style="color:${color}; font-size:10px; font-weight:normal;">${arrow}${Math.abs(mom).toFixed(1)}%</span>`;
+        }
+        tbody.innerHTML += `<tr><td style="text-align:left; font-weight:700;">${i+1}</td><td style="text-align:left;">${v[0]}</td><td>${pct}</td><td>${formatNum(v[1]/1000000)}</td><td>${tHtml}</td></tr>`;
+      });
+    }
+
+    function getPrevYM(ym) {
+      if(!ym) return null;
+      let [y, m] = ym.split('-').map(Number);
+      let d = new Date(y, m - 2, 1);
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    }
+
+    // ================== Product Detail Search ==================
+    function toggleDetailAge(age) {
+      if (currentDetailAge === age) {
+        currentDetailAge = null;
+        document.querySelectorAll('#detailAgeTabs .tab-btn').forEach(b => b.classList.remove('active'));
+      } else {
+        currentDetailAge = age;
+        document.querySelectorAll('#detailAgeTabs .tab-btn').forEach(b => b.classList.remove('active'));
+        let btnId = age === 6 ? 'btnAge6' : age === 3 ? 'btnAge3' : 'btnAgeYear';
+        document.getElementById(btnId).classList.add('active');
+      }
+      applyDetailFilters();
+    }
+
+    function applyDetailFilters() {
+      let codeF = document.getElementById('detailCodeFilter').value;
+      let ipF = document.getElementById('detailIpFilter').value;
+      let now = new Date();
+      let cutoff = null;
+      if (currentDetailAge === 6) cutoff = new Date(now.getFullYear(), now.getMonth() - 6, 1);
+      if (currentDetailAge === 3) cutoff = new Date(now.getFullYear(), now.getMonth() - 3, 1);
+      if (currentDetailAge === 'year') cutoff = new Date(now.getFullYear(), 0, 1);
+
+      if (currentDetailAge === null && codeF === 'ALL' && ipF === 'ALL') {
+        selectedProducts = [];
+        renderDetailTable();
+        document.getElementById('chartTargetName').innerText = '선택 안됨';
+        clearChart('detailTrendChart');
+        renderDetailClients();
+        return;
+      }
+
+      selectedProducts = [];
+      Object.keys(firstSalesDict).forEach(code => {
+        let meta = globalProductMeta[code];
+        if(!meta) return;
+        if(codeF !== 'ALL' && meta.type !== codeF) return;
+        if(ipF !== 'ALL' && meta.ip !== ipF) return;
+        
+        if(cutoff) {
+           let [y, m] = firstSalesDict[code].split('-').map(Number);
+           let lDate = new Date(y, m-1, 1);
+           if(lDate < cutoff || lDate > now) return;
+        }
+        selectedProducts.push({ code, name: meta.name, ip: meta.ip, type: meta.type });
+      });
+      
+      renderDetailTable();
+      if(selectedProducts.length > 0) setDetailTarget(selectedProducts[0].code);
+      else {
+        document.getElementById('chartTargetName').innerText = '검색 결과 없음';
+        clearChart('detailTrendChart');
+        renderDetailClients();
+      }
+    }
+
+    function addProductManual() {
+      currentDetailAge = null;
+      document.querySelectorAll('#detailAgeTabs .tab-btn').forEach(b => b.classList.remove('active'));
+      document.getElementById('detailCodeFilter').value = 'ALL';
+      document.getElementById('detailIpFilter').value = 'ALL';
+
+      let val = document.getElementById('searchInput').value.trim();
+      if(!val) return;
+      let code = val.split(' | ')[0];
+      if(selectedProducts.some(p => p.code === code)) { alert('이미 추가된 제품입니다.'); return; }
+
+      let meta = globalProductMeta[code];
+      if(!meta) return; 
+
+      selectedProducts.push({ code, name: meta.name, ip: meta.ip, type: meta.type });
+      document.getElementById('searchInput').value = ''; 
+      renderDetailTable();
+      setDetailTarget(code);
+    }
+
+    function removeProduct(code) {
+      selectedProducts = selectedProducts.filter(p => p.code !== code);
+      if(detailTargetCode === code) detailTargetCode = null;
+      renderDetailTable();
+      if(selectedProducts.length > 0 && !detailTargetCode) setDetailTarget(selectedProducts[0].code);
+      else if (selectedProducts.length === 0) {
+        clearChart('detailTrendChart');
+        document.getElementById('chartTargetName').innerText = '선택 안됨';
+        renderDetailClients();
+      }
+    }
+
+    function setDetailTarget(code) {
+      detailTargetCode = code;
+      let p = selectedProducts.find(x => x.code === code);
+      document.getElementById('chartTargetName').innerText = p ? p.name : '-';
+      document.querySelectorAll('#detailTableBody tr').forEach(tr => tr.classList.toggle('selected', tr.dataset.code === code));
+      renderDetailChart();
+      renderDetailClients();
+    }
+
+    function renderDetailTable() {
+      let tbody = document.getElementById('detailTableBody');
+      if(selectedProducts.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="12" style="text-align:center; padding: 20px; color:var(--text-tertiary);">검색창이나 필터 버튼을 이용해 제품을 불러오세요. (목록 클릭시 정보 반영)</td></tr>';
+        return;
+      }
+
+      selectedProducts.forEach(sp => {
+        sp.rev = 0; sp.qty = 0;
+        for(let i=0; i<rawSales.length; i++) {
+          let r = rawSales[i];
+          if(r['품목'] === sp.code) {
+            if((currentFilters.year === 'ALL' || r._y === currentFilters.year) && (currentFilters.month === 'ALL' || r._m === currentFilters.month)) {
+              sp.rev += r._rev; sp.qty += r._qty;
+            }
+          }
+        }
+        let info = prodDict[sp.code] || {};
+        sp.moq = info['MOQ']; sp.mold = info['금형비']; sp.ad = info['광고비'];
+        sp.price = info['소비자가']; sp.asp = sp.qty > 0 ? sp.rev/sp.qty : undefined;
+      });
+
+      tbody.innerHTML = '';
+      selectedProducts.forEach((sp, idx) => {
+        let tr = document.createElement('tr');
+        tr.className = 'clickable';
+        tr.dataset.code = sp.code;
+        if(sp.code === detailTargetCode) tr.classList.add('selected');
+        
+        tr.onclick = (e) => { if(!e.target.classList.contains('btn-delete')) setDetailTarget(sp.code); };
+        tr.innerHTML = `
+          <td>${idx + 1}</td>
+          <td style="text-align:left;"><span class="btn-delete" onclick="removeProduct('${sp.code}')">✕</span></td>
+          <td style="text-align:left;">${sp.code}</td><td style="text-align:left;">${sp.name}</td><td>${sp.ip}</td><td>${sp.type}</td>
+          <td>${safeFormat(sp.moq)}</td><td>${safeFormat(sp.mold)}</td><td>${safeFormat(sp.ad)}</td>
+          <td>${safeFormat(sp.price)}</td><td>${safeFormat(sp.asp)}</td>
+          <td style="font-weight:700; color:#000;">${formatNum(sp.rev/1000000)}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function renderDetailClients() {
+      let tbody = document.getElementById('detailClientTableBody');
+      if(!detailTargetCode) {
+        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding: 20px; color:var(--text-tertiary);">제품을 선택하세요.</td></tr>';
+        return;
+      }
+      
+      let cMap = {}; let total = 0;
+      for(let i=0; i<rawSales.length; i++) {
+        let r = rawSales[i];
+        if(r['품목'] === detailTargetCode) {
+          if(currentFilters.year !== 'ALL' && r._y !== currentFilters.year) continue;
+          if(currentFilters.month !== 'ALL' && r._m !== currentFilters.month) continue;
+          cMap[r['거래처']] = (cMap[r['거래처']] || 0) + r._rev;
+          total += r._rev;
+        }
+      }
+      
+      let sorted = Object.entries(cMap).sort((a,b)=>b[1]-a[1]).slice(0,10);
+      tbody.innerHTML = '';
+      if(sorted.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding: 20px; color:var(--text-tertiary);">매출 내역이 없습니다.</td></tr>';
+      } else {
+        sorted.forEach(v => {
+          let pct = total > 0 ? ((v[1]/total)*100).toFixed(1) + '%' : '0%';
+          tbody.innerHTML += `<tr><td style="text-align:left;">${v[0]}</td><td>${formatNum(v[1]/1000000)}</td><td>${pct}</td></tr>`;
+        });
+      }
+    }
+
+    function switchDetailMode(mode) {
+      detailChartMode = mode;
+      document.querySelectorAll('.card .tab-btn').forEach(b => {
+        if(b.innerText === '매출액' || b.innerText === '판매수량') {
+          b.classList.toggle('active', b.innerText === (mode==='revenue' ? '매출액' : '판매수량'));
+        }
+      });
+      renderDetailChart();
+    }
+
+    function renderDetailChart() {
+      if(!detailTargetCode) return;
+      let targetYM = getTargetYM();
+      if(!targetYM) return;
+
+      let [ty, tm] = targetYM.split('-').map(Number);
+      let yms = [];
+      for(let i=23; i>=0; i--) { // 24 Months
+        let d = new Date(ty, tm - 1 - i, 1);
+        yms.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);
+      }
+
+      let mData = {}; yms.forEach(ym => mData[ym] = 0);
+      for(let i=0; i<rawSales.length; i++) {
+        let r = rawSales[i];
+        if(r['품목'] === detailTargetCode && mData.hasOwnProperty(r._ym)) {
+          mData[r._ym] += (detailChartMode === 'revenue' ? r._rev : r._qty);
+        }
+      }
+
+      let labels = yms.map(ym => ym.substring(2).replace('-','.'));
+      let data = yms.map(ym => detailChartMode === 'revenue' ? Math.round(mData[ym]/1000000) : mData[ym]);
+
+      clearChart('detailTrendChart');
+      charts['detailTrendChart'] = new Chart(document.getElementById('detailTrendChart').getContext('2d'), {
+        type: 'line',
+        data: { labels, datasets: [{ data, backgroundColor: 'rgba(14,203,129,0.1)', borderColor: '#0ECB81', borderWidth: 2, fill: true, tension: 0.3 }] },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { 
+            legend: {display: false}, 
+            datalabels: {
+              labels: {
+                value: {
+                  anchor: 'end', align: 'top', offset: 0,
+                  font: { weight: 'bold', size: 10 }, color: '#1E2329',
+                  formatter: (v) => v>0 ? formatNum(v) : ''
+                },
+                mom: {
+                  anchor: 'end', align: 'top', offset: 16,
+                  font: { weight: 'normal', size: 9 }, color: '#B7BDC6', 
+                  formatter: (v, ctx) => {
+                    if(v===0 || ctx.dataIndex===0) return '';
+                    let prev = ctx.chart.data.datasets[0].data[ctx.dataIndex-1];
+                    if(prev > 0) {
+                      let pct = ((v-prev)/prev)*100;
+                      return pct>0 ? `(▲${pct.toFixed(0)}%)` : `(▼${Math.abs(pct).toFixed(0)}%)`;
+                    }
+                    return '';
+                  }
+                }
+              }
+            }
+          },
+          scales: { x:{grid:{display:false}}, y:{grid:{color:'#EAECEF'}, beginAtZero:true, suggestedMax: Math.max(...data)*1.2} }
+        }
+      });
+    }
+
+    function clearChart(id) { if(charts[id]) charts[id].destroy(); }
+
+    // ================== Inventory Tab Methods ==================
+    function setInvGrade(grade) {
+      currentInvGradeFilter = grade;
+      document.querySelectorAll('#invGradeTabs .tab-btn').forEach(b => {
+        let isMatch = false;
+        if(grade === 'ALL' && b.innerText === '전체') isMatch = true;
+        else if(grade === '신제품' && b.innerText === '신제품') isMatch = true;
+        else if(grade === 'BAD' && b.innerText.includes('악성')) isMatch = true;
+        else if(b.innerText.includes(grade + '등급')) isMatch = true;
+        b.classList.toggle('active', isMatch);
+      });
+      renderInventoryTable();
+    }
+
+    function sortInvTable(key) {
+      if(invSortState.key === key) invSortState.asc = !invSortState.asc;
+      else { invSortState.key = key; invSortState.asc = false; }
+      renderInventoryTable();
+    }
+
+    function renderInventoryTable() {
+      let tInv = 0, hqInv = 0, badInv = 0, tInvValue = 0;
+      let ipFilter = document.getElementById('invIpFilter').value;
+      let codeFilter = document.getElementById('invCodeFilter').value;
+      
+      rawInv.forEach(r => {
+        tInv += r._total;
+        hqInv += r._hqTotal;
+        if(r._isBad) badInv += r._hqTotal;
+        let cost = parseFloat(prodDict[r['품목']]?.['표준단위원가']) || 0;
+        tInvValue += (r._total * cost);
+      });
+
+      document.getElementById('inv-total-qty').innerText = formatNum(tInv);
+      document.getElementById('inv-total-value').innerText = (tInvValue / 100000000).toFixed(1);
+      document.getElementById('inv-hq-qty').innerText = formatNum(hqInv);
+      document.getElementById('inv-hq-sub').innerText = `총 재고수량 대비 ${tInv>0 ? (hqInv/tInv*100).toFixed(1):0}%`;
+      document.getElementById('inv-bad-qty').innerText = formatNum(badInv);
+      document.getElementById('inv-bad-sub').innerText = `영업본부 재고 대비 ${hqInv>0 ? (badInv/hqInv*100).toFixed(1):0}%`;
+
+      // Filter
+      let filtered = rawInv.filter(r => {
+        if(ipFilter !== 'ALL' && r._ip !== ipFilter) return false;
+        if(codeFilter !== 'ALL' && r._type !== codeFilter) return false;
+        if(currentInvGradeFilter !== 'ALL') {
+          if(currentInvGradeFilter === 'BAD' && !r._isBad) return false;
+          else if(currentInvGradeFilter !== 'BAD' && r._grade !== currentInvGradeFilter) return false;
+        }
+        return true;
+      });
+
+      // Sum Row for filtered
+      let sumTotal=0, sumHq=0, sumT1=0, sumT2=0, sumOn=0, sumOv=0, sumPl=0;
+      filtered.forEach(r => {
+        sumTotal += r._total; sumHq += r._hqTotal;
+        sumT1 += r._t1; sumT2 += r._t2; sumOn += r._on; sumOv += r._ov; sumPl += r._pl;
+      });
+      
+      document.getElementById('invSumTotal').innerText = formatNum(sumTotal);
+      document.getElementById('invSumHq').innerText = formatNum(sumHq);
+      document.getElementById('invSumT1').innerText = formatNum(sumT1);
+      document.getElementById('invSumT2').innerText = formatNum(sumT2);
+      document.getElementById('invSumOn').innerText = formatNum(sumOn);
+      document.getElementById('invSumOv').innerText = formatNum(sumOv);
+      document.getElementById('invSumPl').innerText = formatNum(sumPl);
+
+      // Sorting
+      let sorted = filtered.sort((a,b) => {
+        let va, vb;
+        switch(invSortState.key) {
+          case 'code': va = a['품목']||''; vb = b['품목']||''; break;
+          case 'ip': va = a._ip||''; vb = b._ip||''; break;
+          case 'name': va = a['품목명']||''; vb = b['품목명']||''; break;
+          case 'grade': va = a._grade === '신제품' ? -1 : a._grade; vb = b._grade === '신제품' ? -1 : b._grade; break;
+          case 'total': va = a._total; vb = b._total; break;
+          case 'hqTotal': va = a._hqTotal; vb = b._hqTotal; break;
+          case 't1': va = a._t1; vb = b._t1; break;
+          case 't2': va = a._t2; vb = b._t2; break;
+          case 'on': va = a._on; vb = b._on; break;
+          case 'ov': va = a._ov; vb = b._ov; break;
+          case 'pl': va = a._pl; vb = b._pl; break;
+        }
+        if(typeof va === 'string') return invSortState.asc ? va.localeCompare(vb) : vb.localeCompare(va);
+        return invSortState.asc ? va - vb : vb - va;
+      }).slice(0, 100);
+
+      let tbody = document.getElementById('invTableBody');
+      tbody.innerHTML = '';
+      
+      if(sorted.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="11" style="text-align:center; padding: 20px;">조건에 맞는 재고 데이터가 없습니다.</td></tr>';
+        return;
+      }
+
+      sorted.forEach(r => {
+        let code = r['품목'] || '-';
+        let ip = r._ip || '-';
+        let name = r['품목명'] || '-';
+        let gradeCls = r._isBad ? 'bad-stock' : '';
+        
+        tbody.innerHTML += `<tr>
+          <td style="text-align:left;">${code}</td>
+          <td style="text-align:left;">${ip}</td>
+          <td style="text-align:left; font-weight:600;">${name}</td>
+          <td class="${gradeCls}">${r._grade}</td>
+          <td style="color:var(--text-tertiary);">${formatNum(r._total)}</td>
+          <td style="font-weight:700;">${formatNum(r._hqTotal)}</td>
+          <td>${formatNum(r._t1)}</td><td>${formatNum(r._t2)}</td><td>${formatNum(r._on)}</td><td>${formatNum(r._ov)}</td><td>${formatNum(r._pl)}</td>
+        </tr>`;
+      });
+    }
+  </script>
+</body>
+</html>
